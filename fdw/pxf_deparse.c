@@ -119,8 +119,8 @@ PxfClassifyConditions(PlannerInfo *root,
  */
 static bool
 IsForeignExpr(PlannerInfo *root,
-              RelOptInfo *baserel,
-              Expr *expr)
+			  RelOptInfo *baserel,
+			  Expr *expr)
 {
 	foreign_glob_cxt glob_cxt;
 	foreign_loc_cxt loc_cxt;
@@ -136,9 +136,12 @@ IsForeignExpr(PlannerInfo *root,
 	if (!ForeignExprWalker((Node *) expr, &glob_cxt, &loc_cxt))
 		return false;
 
-	/* Expressions examined here should be boolean, ie noncollatable */
-	Assert(loc_cxt.collation == InvalidOid);
-	Assert(loc_cxt.state == FDW_COLLATE_NONE);
+	/*
+	 * If the expression has a valid collation that does not arise from a
+	 * foreign var, the expression can not be sent over.
+	 */
+	if (loc_cxt.state == FDW_COLLATE_UNSAFE)
+		return false;
 
 	/*
 	 * An expression which includes any mutable functions can't be sent over
@@ -168,8 +171,8 @@ IsForeignExpr(PlannerInfo *root,
  */
 static bool
 ForeignExprWalker(Node *node,
-                  foreign_glob_cxt *glob_cxt,
-                  foreign_loc_cxt *outer_cxt)
+				  foreign_glob_cxt *glob_cxt,
+				  foreign_loc_cxt *outer_cxt)
 {
 	foreign_loc_cxt inner_cxt;
 	Oid			collation;
@@ -361,7 +364,7 @@ ForeignExprWalker(Node *node,
 				 * Recurse to input subexpressions.
 				 */
 				if (!ForeignExprWalker((Node *) a->elements,
-				                       glob_cxt, &inner_cxt))
+						   glob_cxt, &inner_cxt))
 					return false;
 			}
 			break;
