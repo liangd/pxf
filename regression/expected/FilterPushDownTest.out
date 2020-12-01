@@ -1,0 +1,305 @@
+-----------------------------------------------------
+------ Check that Filter Push Down is working -------
+-----------------------------------------------------
+-- Check that the filter is being pushed down. We create an external table
+-- that returns the filter being sent from the C-side
+DROP EXTERNAL TABLE IF EXISTS test_filter CASCADE;
+CREATE EXTERNAL TABLE test_filter (t0 text, a1 integer, b2 boolean, filterValue text)
+    LOCATION (E'pxf://dummy_path?FRAGMENTER=org.greenplum.pxf.diagnostic.FilterVerifyFragmenter&ACCESSOR=org.greenplum.pxf.diagnostic.UserDataVerifyAccessor&RESOLVER=org.greenplum.pxf.plugins.hdfs.StringPassResolver')
+    FORMAT 'TEXT' ( DELIMITER ',');
+SET gp_external_enable_filter_pushdown = true;
+SET optimizer = off;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ A  |  0 | t  | a0c25s1dAo5a1c23s1d0o5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND a1 <= 1 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ B  |  1 | f  | a1c23s1d1o3a0c25s1dBo5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue               
+----+----+----+----------------------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue              
+----+----+----+---------------------------------------
+ A  |  0 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+(3 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false ORDER BY t0, a1;
+ t0 | a1 | b2 |   filtervalue    
+----+----+----+------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2
+ D  |  3 | f  | a2c16s4dtrueo0l2
+ F  |  5 | f  | a2c16s4dtrueo0l2
+ H  |  7 | f  | a2c16s4dtrueo0l2
+ J  |  9 | f  | a2c16s4dtrueo0l2
+(5 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |                 filtervalue                 
+----+----+----+---------------------------------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  b2 = false OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |                filtervalue                 
+----+----+----+--------------------------------------------
+ A  |  0 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ D  |  3 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ F  |  5 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ H  |  7 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ J  |  9 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+(7 rows)
+
+SET optimizer = on;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ A  |  0 | t  | a0c25s1dAo5a1c23s1d0o5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND a1 <= 1 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o3l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue               
+----+----+----+----------------------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue              
+----+----+----+---------------------------------------
+ A  |  0 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+(3 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false ORDER BY t0, a1;
+ t0 | a1 | b2 |   filtervalue    
+----+----+----+------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2
+ D  |  3 | f  | a2c16s4dtrueo0l2
+ F  |  5 | f  | a2c16s4dtrueo0l2
+ H  |  7 | f  | a2c16s4dtrueo0l2
+ J  |  9 | f  | a2c16s4dtrueo0l2
+(5 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |                 filtervalue                 
+----+----+----+---------------------------------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  b2 = false OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |                filtervalue                 
+----+----+----+--------------------------------------------
+ A  |  0 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ D  |  3 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ F  |  5 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ H  |  7 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ J  |  9 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+(7 rows)
+
+-----------------------------------------------------
+------ Check that Filter Push Down is disabled ------
+-----------------------------------------------------
+-- Now let's make sure nothing gets pushed down when we disable the
+-- gp_external_enable_filter_pushdown guc
+SET gp_external_enable_filter_pushdown = off;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 | filtervalue 
+----+----+----+-------------
+ A  |  0 | t  | No filter
+(1 row)
+
+-- Recreate the same table as above, but now we use varchar for the t0 column
+-- type. We want to make sure varchar predicates are being pushed down.
+DROP EXTERNAL TABLE IF EXISTS test_filter CASCADE;
+CREATE EXTERNAL TABLE test_filter (t0 varchar(1), a1 integer, b2 boolean, filterValue text)
+    LOCATION (E'pxf://dummy_path?FRAGMENTER=org.greenplum.pxf.diagnostic.FilterVerifyFragmenter&ACCESSOR=org.greenplum.pxf.diagnostic.UserDataVerifyAccessor&RESOLVER=org.greenplum.pxf.plugins.hdfs.StringPassResolver')
+    FORMAT 'TEXT' ( DELIMITER ',');
+SET gp_external_enable_filter_pushdown = true;
+SET optimizer = off;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ A  |  0 | t  | a0c25s1dAo5a1c23s1d0o5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND a1 <= 1 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ B  |  1 | f  | a1c23s1d1o3a0c25s1dBo5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue               
+----+----+----+----------------------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue              
+----+----+----+---------------------------------------
+ A  |  0 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+(3 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false ORDER BY t0, a1;
+ t0 | a1 | b2 |   filtervalue    
+----+----+----+------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2
+ D  |  3 | f  | a2c16s4dtrueo0l2
+ F  |  5 | f  | a2c16s4dtrueo0l2
+ H  |  7 | f  | a2c16s4dtrueo0l2
+ J  |  9 | f  | a2c16s4dtrueo0l2
+(5 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |                 filtervalue                 
+----+----+----+---------------------------------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  b2 = false OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |                filtervalue                 
+----+----+----+--------------------------------------------
+ A  |  0 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ D  |  3 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ F  |  5 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ H  |  7 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ J  |  9 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+(7 rows)
+
+SET optimizer = on;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ A  |  0 | t  | a0c25s1dAo5a1c23s1d0o5l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND a1 <= 1 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o3l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue               
+----+----+----+----------------------------------------
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  t0 = 'B' OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |              filtervalue              
+----+----+----+---------------------------------------
+ A  |  0 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a0c25s1dBo5a1c23s1d0o4a1c23s1d2o3l0l1
+(3 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false ORDER BY t0, a1;
+ t0 | a1 | b2 |   filtervalue    
+----+----+----+------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2
+ D  |  3 | f  | a2c16s4dtrueo0l2
+ F  |  5 | f  | a2c16s4dtrueo0l2
+ H  |  7 | f  | a2c16s4dtrueo0l2
+ J  |  9 | f  | a2c16s4dtrueo0l2
+(5 rows)
+
+SELECT * FROM test_filter WHERE  b2 = false AND (a1 = 1 OR a1 = 10) ORDER BY t0, a1;
+ t0 | a1 | b2 |                 filtervalue                 
+----+----+----+---------------------------------------------
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d1o5a1c23s2d10o5l1l0
+(1 row)
+
+SELECT * FROM test_filter WHERE  b2 = false OR (a1 >= 0 AND a1 <= 2) ORDER BY t0, a1;
+ t0 | a1 | b2 |                filtervalue                 
+----+----+----+--------------------------------------------
+ A  |  0 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ B  |  1 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ C  |  2 | t  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ D  |  3 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ F  |  5 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ H  |  7 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+ J  |  9 | f  | a2c16s4dtrueo0l2a1c23s1d0o4a1c23s1d2o3l0l1
+(7 rows)
+
+-- Now let's make sure nothing gets pushed down when we disable the
+-- gp_external_enable_filter_pushdown guc
+SET gp_external_enable_filter_pushdown = off;
+SELECT * FROM test_filter WHERE  t0 = 'A' and a1 = 0 ORDER BY t0, a1;
+ t0 | a1 | b2 | filtervalue 
+----+----+----+-------------
+ A  |  0 | t  | No filter
+(1 row)
+
+-----------------------------------------------------------------------
+------ Check that Filter Push Down is working with HEX delimiter ------
+-----------------------------------------------------------------------
+DROP EXTERNAL TABLE IF EXISTS test_filter CASCADE;
+CREATE EXTERNAL TABLE test_filter (t0 text, a1 integer, b2 boolean, filterValue text)
+    LOCATION (E'pxf://dummy_path?FRAGMENTER=org.greenplum.pxf.diagnostic.FilterVerifyFragmenter&ACCESSOR=org.greenplum.pxf.diagnostic.UserDataVerifyAccessor&RESOLVER=org.greenplum.pxf.plugins.hdfs.StringPassResolver')
+    FORMAT 'TEXT' ( DELIMITER E'\x01');
+SET gp_external_enable_filter_pushdown = true;
+SET optimizer = off;
+SELECT * FROM test_filter WHERE t0 = 'J' and a1 = 9 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ J  |  9 | f  | a0c25s1dJo5a1c23s1d9o5l0
+(1 row)
+
+SET optimizer = on;
+SELECT * FROM test_filter WHERE t0 = 'J' and a1 = 9 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ J  |  9 | f  | a0c25s1dJo5a1c23s1d9o5l0
+(1 row)
+
+-- Recreate the same table as above and make sure that varchar is also being
+-- pushed down.
+DROP EXTERNAL TABLE IF EXISTS test_filter CASCADE;
+CREATE EXTERNAL TABLE test_filter (t0 varchar(1), a1 integer, b2 boolean, filterValue text)
+    LOCATION (E'pxf://dummy_path?FRAGMENTER=org.greenplum.pxf.diagnostic.FilterVerifyFragmenter&ACCESSOR=org.greenplum.pxf.diagnostic.UserDataVerifyAccessor&RESOLVER=org.greenplum.pxf.plugins.hdfs.StringPassResolver')
+    FORMAT 'TEXT' ( DELIMITER E'\x01');
+SET gp_external_enable_filter_pushdown = true;
+SET optimizer = off;
+SELECT * FROM test_filter WHERE t0 = 'J' and a1 = 9 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ J  |  9 | f  | a0c25s1dJo5a1c23s1d9o5l0
+(1 row)
+
+SET optimizer = on;
+SELECT * FROM test_filter WHERE t0 = 'J' and a1 = 9 ORDER BY t0, a1;
+ t0 | a1 | b2 |       filtervalue        
+----+----+----+--------------------------
+ J  |  9 | f  | a0c25s1dJo5a1c23s1d9o5l0
+(1 row)
+
+-- start_ignore
+-- clean up used tables
+DROP EXTERNAL TABLE IF EXISTS test_filter CASCADE;
+-- end_ignore

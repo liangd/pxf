@@ -612,9 +612,7 @@ jobs:
   - put: pxf_gp[[gp_ver]]_tarball_rhel7
     params:
       file: dist/pxf-gp[[gp_ver]]-*.el7.tar.gz
-{% endfor %}
 
-{% for gp_ver in range(5, 7) %}
 - name: Test PXF-GP[[gp_ver]]-HDP2 on RHEL7
   plan:
   - in_parallel:
@@ -638,11 +636,17 @@ jobs:
     params:
       ACCESS_KEY_ID: ((tf-machine-access-key-id))
       GP_VER: [[gp_ver]]
+{% if gp_ver == 7 %}
+      GROUP: fdw_gpdb_schedule
+      HADOOP_JAVA_HOME: /usr/lib/jvm/jre-1.8.0-openjdk
+      PG_REGRESS: true
+{% else %}
       GROUP: gpdb,proxy,profile
+{% endif %}
       SECRET_ACCESS_KEY: ((tf-machine-secret-access-key))
       TARGET_OS: centos
       TARGET_OS_VERSION: 7
-{% endfor %} {# gp_ver 5 and 6 #}
+{% endfor %} {# gp_ver 5, 6, and 7 #}
 
 - name: Test PXF-GP6-HDP2 on OEL7
   plan:
